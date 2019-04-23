@@ -142,7 +142,7 @@ bqr_auth(token = NULL, new_user = FALSE, no_auto = FALSE)
 
 bqr_upload_data(projectId = "nu-skin-corp", 
                 datasetId = "REPORTING",
-                tableId   = "SUMMARY_MONTH_ONBOARDING_TEST",
+                tableId   = "SUMMARY_MONTH_ONBOARDING",
                 upload_data = datEnd)
 
 #below I'm just organizing some daters
@@ -161,7 +161,7 @@ summary(t2$var)
 
 project_id <- "nu-skin-corp"
 
-sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_TEST` t1
+sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` t1
 SET mth2_pv_amt = (SELECT cast(round(tov_amt,0) as int64)
                   FROM `nu-skin-corp.EDW.KPIR_FLAG_DTL` kfd
                   WHERE kfd.dist_id = t1.dist_id 
@@ -171,7 +171,7 @@ WHERE t1.comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2
 
 query_results_tov <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
-sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_TEST`
+sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING`
 SET mth2_pv_ret_flg = 1 
 WHERE mth2_pv_amt > 0 AND comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH) "
 
