@@ -6,17 +6,34 @@
 #install.packages("dplyr")
 #install.packages("bigQueryR")
 #devtools::install_github("r-dbi/bigrquery")
+#install.packages("lubridate")
 setwd("C:/Users/jcooke/Documents/projects/learningCenter")
 rm(list=ls())
 library(ggplot2)
 library(bigrquery)
 library(dplyr)
 library(class)
+library(lubridate)
+
+updatedMonth <- as.Date('2019-03-01')
+lastDayUpdatedMonth <- updatedMonth %m+% months(1) - 1
+previousMonth <- updatedMonth %m-% months(1)
 
 #STEP 1: update summary_month_onboarding with new month data joining lc data to other data
 
 project_id <- "nu-skin-corp"
-sql_string <- "SELECT first.*, ifnull(mth_orders,0) mth_ord_cnt, ifnull(mth_pv,0) mth_pv_amt, ifnull(mth_spon_cnt,0) mth_spon_cnt, 0 cntrl_group_flg, 0  mth2_pv_ret_flg, cast(0.00 as float64) mth2_pv_amt, cast(0.00 as float64) ltv_amt
+sql_string <- "SELECT 
+                  first.*
+, ifnull(mth_orders,0) mth_ord_cnt
+, ifnull(mth_pv,0) mth_pv_amt
+, ifnull(mth_spon_all_cnt,0) mth_spon_all_cnt
+, ifnull(mth_spon_ba_cnt,0) mth_spon_ba_cnt
+, 0 cntrl_group_flg
+, 0  mth2_pv_ret_flg
+, cast(0.00 as float64) mth2_pv_amt
+, cast(0.00 as float64) lftv_amt
+, cast(0 as int64) lfspon_cnt
+, cast(0 as int64) submt_loi_flg_cnt
 FROM
 (SELECT
 kfd.comm_month_dt
@@ -34,11 +51,7 @@ else 'Unknown'
 end ttl_cat
 , case when ob.sap_id is not null then 1 else 0 end lc_flg
 , kfd.submt_loi_flg mth_loi_flg
-, CASE WHEN badge_title = \"Get Started Graduate\" THEN 'Graduated'
-WHEN tasks_completed >= 7 THEN 'At least 7 tasks completed'
-WHEN tasks_completed >= 1 THEN 'At least 1 task complete'
-WHEN tasks_completed >= 0 THEN 'Account Created' END ob_cat
-, case when badge_title = \"Get Started Graduate\" then 1 else 0 end graduated_flg
+, case when badge_id = 18320 then 1 else 0 end graduated_flg
 , case when tasks_completed >= 7 then 1 else 0 end Tasks7_flg
 , case when tasks_completed >= 1 then 1 else 0 end Tasks1_flg
 , ob.*
@@ -48,19 +61,20 @@ FROM (select comm_month_dt, dist_id, tov_amt, new_signup_flg, ttl_cd, submt_loi_
 from `nu-skin-corp.EDW.KPIR_FLAG_DTL`
 where ttl_cd is not null --remove any retail accounts
 and ttl_cd <> 55 -- remove PFC accounts
-and comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)
+and comm_month_dt =  DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)
 and dist_cntry_cd in (1,2,6,13)
 and new_signup_flg = 1) kfd --US/CAN/AS/NZ only
 JOIN `nu-skin-corp.EDW.TTL` ttl ON kfd.ttl_cd = ttl.ttl_cd
 JOIN `nu-skin-corp.EDW.COMM_PER` cp ON kfd.comm_month_dt = cp.strt_dt
 LEFT JOIN (SELECT rw_id, sap_id, acct_create_dt, last_login_date, tasks_started, tasks_completed, badges_received
 FROM `nu-skin-corp.ONBOARDING.SUMMARY`
-where file_date = DATE_ADD(CURRENT_DATE(), INTERVAL -EXTRACT(DAY FROM CURRENT_DATE()) DAY)) ob ON kfd.dist_id = ob.sap_id
+where file_date = DATE_ADD(CURRENT_DATE(), INTERVAL -EXTRACT(DAY FROM CURRENT_DATE()) DAY)) ob ON kfd.dist_id = ob.sap_id 
 LEFT JOIN `nu-skin-corp.EDW.CNTRY_REGION` rg ON kfd.dist_cntry_cd = rg.cntry_cd
 LEFT JOIN (select ba.rw_id, ba.badge_id, badge_desc.badge_title
 from `nu-skin-corp.ONBOARDING.BADGES_ACHIEVED` ba 
 JOIN `nu-skin-corp.ONBOARDING.BADGES` badge_desc on ba.badge_id = badge_desc.badge_id
-where badge_title = 'Get Started Graduate') grad ON ob.sap_id = cast(grad.rw_id as string)) as first
+where ba.badge_id = 18320 and achieved_dt BETWEEN DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH) AND DATE_ADD(CURRENT_DATE(), INTERVAL -EXTRACT(DAY FROM CURRENT_DATE()) DAY)) grad 
+ON cast(ob.rw_id as string) = cast(grad.rw_id as string)) as first
 
 LEFT JOIN (select dist_id, count(ord_id) mth_orders, round(sum(ord_pv),0) mth_pv
 from
@@ -71,10 +85,15 @@ AND on_order_flg = 1
 group by dist_id, ord_id)
 group by dist_id) as second ON first.dist_id = second.dist_id
 
-LEFT JOIN (SELECT comm_per.strt_dt spon_mth_dt, spon_dist_id dist_id, count(dist_cust_id) mth_spon_cnt
-FROM `nu-skin-corp.EDW.DIST_CUST`
-JOIN `nu-skin-corp.EDW.COMM_PER` comm_per ON appl_dt BETWEEN comm_per.strt_dt AND comm_per.end_dt
-Group BY spon_dist_id, comm_per.strt_dt) as spon ON first.dist_id = spon.dist_id AND first.comm_month_dt = spon.spon_mth_dt
+LEFT JOIN (SELECT kfd.comm_month_dt spon_mth_dt, spon_dist_id dist_id, sum(new_signup_flg) mth_spon_all_cnt, sum(case when ttl.ttl_rank between 6 and 14 then 1 else 0 end) mth_spon_ba_cnt
+FROM `nu-skin-corp.EDW.DIST_CUST` dc
+JOIN (select comm_month_dt, dist_id, ttl_cd, new_signup_flg
+from `nu-skin-corp.EDW.KPIR_FLAG_DTL`
+where new_signup_flg = 1
+and mth_pv_act_flg = 1
+and comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)) kfd on dc.dist_cust_id = kfd.dist_id 
+LEFT JOIN `nu-skin-corp.EDW.TTL` ttl ON kfd.ttl_cd = ttl.ttl_cd
+group BY spon_dist_id, kfd.comm_month_dt) as spon ON first.dist_id = spon.dist_id AND first.comm_month_dt = spon.spon_mth_dt
 "
 query_results <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
@@ -135,15 +154,16 @@ datEnd$cntrl_group_flg <- as.integer(datEnd$cntrl_group_flg)
 #change mth2_pv_amt to numeric
 
 datEnd$mth2_pv_amt <- as.numeric(datEnd$mth2_pv_amt)
-datEnd$ltv_amt <- as.numeric(datEnd$ltv_amt)
+datEnd$lftv_amt <- as.numeric(datEnd$lftv_amt)
 
 library(bigQueryR)
 bqr_auth(token = NULL, new_user = FALSE, no_auto = FALSE)
 
 bqr_upload_data(projectId = "nu-skin-corp", 
                 datasetId = "REPORTING",
-                tableId   = "SUMMARY_MONTH_ONBOARDING",
-                upload_data = datEnd)
+                tableId   = "SUMMARY_MONTH_ONBOARDING_V2",
+                upload_data = datEnd,
+                overwrite = FALSE)
 
 #below I'm just organizing some daters
 
@@ -161,22 +181,33 @@ summary(t2$var)
 
 project_id <- "nu-skin-corp"
 
-sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` t1
-SET mth2_pv_amt = (SELECT cast(round(tov_amt,0) as int64)
-                  FROM `nu-skin-corp.EDW.KPIR_FLAG_DTL` kfd
-                  WHERE kfd.dist_id = t1.dist_id 
-                        and t1.comm_month_dt = date_add(kfd.comm_month_dt, interval -1 month))
+sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_V2` t1
+    SET mth2_pv_amt = (SELECT cast(round(tov_amt,0) as int64)
+    FROM `nu-skin-corp.EDW.KPIR_FLAG_DTL` kfd
+    WHERE kfd.dist_id = t1.dist_id 
+        and kfd.comm_month_dt = date_add(kfd.comm_month_dt, interval -1 month))
 WHERE t1.comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)"
 
 
 query_results_tov <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
-sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING`
+sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_V2`
 SET mth2_pv_ret_flg = 1 
-WHERE mth2_pv_amt > 0 AND comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH) "
+WHERE mth2_pv_amt > 0 AND comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)" 
 
 
 query_results_tov <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
+
+# Build Lifetime Value
+
+sql_string <- "update `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_V2` smo
+set smo.lftv_amt = (SELECT ltv.lftv_amt
+                   FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
+                   where smo.dist_id = ltv.dist_id
+                   ) t1 where smo.dist_id = t1.dist_id"
+
+query_results_lftv_amt <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
+
 
 
 datEnd$f1f2 <- interaction(datEnd$lc_flg, datEnd$cntrl_group_flg)
@@ -186,7 +217,7 @@ boxplot <- ggplot(datEnd, aes(x = f1f2, y = mth_pv_amt)) +
   coord_cartesian(ylim = c(0, 1000)) +
   stat_summary(fun.y=mean, geom="point", shape=8, size=4)
 
-boxplot <- ggplot(datEnd, aes(x = f1f2, y = mth_spon)) +
+boxplot <- ggplot(datEnd, aes(x = f1f2, y = mth_spon_all_cnt)) +
   geom_boxplot(outlier.colour='red') +
   # coord_cartesian(ylim = c(0, 1000)) +
   stat_summary(fun.y=mean, geom="point", shape=8, size=4)
