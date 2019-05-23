@@ -161,7 +161,7 @@ bqr_auth(token = NULL, new_user = FALSE, no_auto = FALSE)
 
 bqr_upload_data(projectId = "nu-skin-corp", 
                 datasetId = "REPORTING",
-                tableId   = "SUMMARY_MONTH_ONBOARDING_V2",
+                tableId   = "SUMMARY_MONTH_ONBOARDING",
                 upload_data = datEnd,
                 overwrite = FALSE)
 
@@ -181,7 +181,7 @@ summary(t2$var)
 
 project_id <- "nu-skin-corp"
 
-sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_V2` t1
+sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` t1
     SET mth2_pv_amt = (SELECT cast(round(tov_amt,0) as int64)
     FROM `nu-skin-corp.EDW.KPIR_FLAG_DTL` kfd
     WHERE kfd.dist_id = t1.dist_id 
@@ -191,7 +191,7 @@ WHERE t1.comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2
 
 query_results_tov <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
-sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_V2`
+sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING`
 SET mth2_pv_ret_flg = 1 
 WHERE mth2_pv_amt > 0 AND comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)" 
 
@@ -200,11 +200,20 @@ query_results_tov <- query_exec(sql_string, project = project_id, use_legacy_sql
 
 # Build Lifetime Value
 
-sql_string <- "update `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_V2` smo
-set smo.lftv_amt = (SELECT ltv.lftv_amt
-                   FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
-                   where smo.dist_id = ltv.dist_id
-                   ) t1 where smo.dist_id = t1.dist_id"
+sql_string <- "update `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` smo
+                  set smo.lftv_amt = (SELECT ltv.lftv_amt
+                    FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
+                    where smo.dist_id = ltv.dist_id
+                    )
+                    , smo.lfspon_cnt = (SELECT ltv.lfspon_cnt
+                    FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
+                    where smo.dist_id = ltv.dist_id
+                    )
+                    , smo.submt_loi_flg_cnt = (SELECT ltv.submt_loi_flg_cnt
+                    FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
+                    where smo.dist_id = ltv.dist_id
+                    )
+                    where smo.dist_id IN (SELECT dist_id FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT`)"
 
 query_results_lftv_amt <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
