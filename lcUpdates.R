@@ -15,9 +15,9 @@ library(dplyr)
 library(class)
 library(lubridate)
 
-updatedMonth <- as.Date('2019-03-01')
-lastDayUpdatedMonth <- updatedMonth %m+% months(1) - 1
-previousMonth <- updatedMonth %m-% months(1)
+#updatedMonth <- as.Date('2019-03-01')
+#lastDayUpdatedMonth <- updatedMonth %m+% months(1) - 1
+#previousMonth <- updatedMonth %m-% months(1)
 
 #STEP 1: update summary_month_onboarding with new month data joining lc data to other data
 
@@ -218,18 +218,17 @@ sql_string <- "update `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` smo
 query_results_lftv_amt <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
 
+#datEnd$f1f2 <- interaction(datEnd$lc_flg, datEnd$cntrl_group_flg)
 
-datEnd$f1f2 <- interaction(datEnd$lc_flg, datEnd$cntrl_group_flg)
+#boxplot <- ggplot(datEnd, aes(x = f1f2, y = mth_pv_amt)) +
+#  geom_boxplot(outlier.colour='red') +
+#  coord_cartesian(ylim = c(0, 1000)) +
+#  stat_summary(fun.y=mean, geom="point", shape=8, size=4)
 
-boxplot <- ggplot(datEnd, aes(x = f1f2, y = mth_pv_amt)) +
-  geom_boxplot(outlier.colour='red') +
-  coord_cartesian(ylim = c(0, 1000)) +
-  stat_summary(fun.y=mean, geom="point", shape=8, size=4)
-
-boxplot <- ggplot(datEnd, aes(x = f1f2, y = mth_spon_all_cnt)) +
-  geom_boxplot(outlier.colour='red') +
+#boxplot <- ggplot(datEnd, aes(x = f1f2, y = mth_spon_all_cnt)) +
+ # geom_boxplot(outlier.colour='red') +
   # coord_cartesian(ylim = c(0, 1000)) +
-  stat_summary(fun.y=mean, geom="point", shape=8, size=4)
+  #stat_summary(fun.y=mean, geom="point", shape=8, size=4)
 
 
-boxplot
+#boxplot
