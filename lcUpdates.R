@@ -1,3 +1,8 @@
+# You may have to install the below packages if you don't already have them. I would just go ahead and run lines 3 through 11 without
+# the commented out hash tag thingys
+
+# you will also have to change your working directory.  Create a folder for this to run in and use that as your working directory
+
 #install.packages("bigrquery")
 #install.packages("curl")
 #install.packages("jsonlite")
