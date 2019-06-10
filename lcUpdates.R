@@ -193,14 +193,6 @@ sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` t1
                         and kfd.comm_month_dt = date_add(t1.comm_month_dt, interval 1 month))
                   WHERE t1.comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)"
 
-#old error query
-#UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` t1
-#SET mth2_pv_amt = (SELECT cast(round(tov_amt,0) as int64)
-#                  FROM `nu-skin-corp.EDW.KPIR_FLAG_DTL` kfd
-#                   WHERE kfd.dist_id = t1.dist_id 
-#                   and kfd.comm_month_dt = date_add(kfd.comm_month_dt, interval -1 month))
-#WHERE t1.comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)
-
 
 query_results_tov <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
