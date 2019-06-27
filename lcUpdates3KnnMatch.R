@@ -28,7 +28,7 @@ library(lubridate)
 
 project_id <- "nu-skin-corp"
 sql_string <- "SELECT 
-                  first.*
+first.*
 , ifnull(mth_orders,0) mth_ord_cnt
 , ifnull(mth_pv,0) mth_pv_amt
 , ifnull(mth_spon_all_cnt,0) mth_spon_all_cnt
@@ -176,10 +176,9 @@ t2$index <- seq.int(nrow(t2))
 
 #columns needed are index, 1, mth_pv_amt.y
 
-output <- as.data.frame(merge(t2, noLc, by.x = '1', by.y = 'index'))
-output <- output %>% select(index, "1", mth_pv_amt.y)
+output <- as.data.frame(merge(t2, noLc, by.x = '1', by.y = 'index') [, c(5,1,29)])
 output <- output[order(output$index),] 
-output <- output %>% select(mth_pv_amt.y)
+output <- output[c(3)]
 t2 <- cbind(t2, output)
 
 t2$var <- round(apply(t2, 1, function(x) x[1] - x[6]), 2)
@@ -188,11 +187,11 @@ summary(t2$var)
 project_id <- "nu-skin-corp"
 
 sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` t1
-    SET mth2_pv_amt = (SELECT cast(round(tov_amt,0) as int64)
-                        FROM `nu-skin-corp.EDW.KPIR_FLAG_DTL` kfd
-                        WHERE kfd.dist_id = t1.dist_id 
-                        and kfd.comm_month_dt = date_add(t1.comm_month_dt, interval 1 month))
-                  WHERE t1.comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)"
+SET mth2_pv_amt = (SELECT cast(round(tov_amt,0) as int64)
+FROM `nu-skin-corp.EDW.KPIR_FLAG_DTL` kfd
+WHERE kfd.dist_id = t1.dist_id 
+and kfd.comm_month_dt = date_add(t1.comm_month_dt, interval 1 month))
+WHERE t1.comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)"
 
 
 query_results_tov <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
@@ -207,19 +206,19 @@ query_results_tov <- query_exec(sql_string, project = project_id, use_legacy_sql
 # Build Lifetime Value
 
 sql_string <- "update `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` smo
-                  set smo.lftv_amt = (SELECT ltv.lftv_amt
-                    FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
-                    where smo.dist_id = ltv.dist_id
-                    )
-                    , smo.lfspon_cnt = (SELECT ltv.lfspon_cnt
-                    FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
-                    where smo.dist_id = ltv.dist_id
-                    )
-                    , smo.submt_loi_flg_cnt = (SELECT ltv.submt_loi_flg_cnt
-                    FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
-                    where smo.dist_id = ltv.dist_id
-                    )
-                    where smo.dist_id IN (SELECT dist_id FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT`)"
+set smo.lftv_amt = (SELECT ltv.lftv_amt
+FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
+where smo.dist_id = ltv.dist_id
+)
+, smo.lfspon_cnt = (SELECT ltv.lfspon_cnt
+FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
+where smo.dist_id = ltv.dist_id
+)
+, smo.submt_loi_flg_cnt = (SELECT ltv.submt_loi_flg_cnt
+FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
+where smo.dist_id = ltv.dist_id
+)
+where smo.dist_id IN (SELECT dist_id FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT`)"
 
 query_results_lftv_amt <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
@@ -232,9 +231,9 @@ query_results_lftv_amt <- query_exec(sql_string, project = project_id, use_legac
 #  stat_summary(fun.y=mean, geom="point", shape=8, size=4)
 
 #boxplot <- ggplot(datEnd, aes(x = f1f2, y = mth_spon_all_cnt)) +
- # geom_boxplot(outlier.colour='red') +
-  # coord_cartesian(ylim = c(0, 1000)) +
-  #stat_summary(fun.y=mean, geom="point", shape=8, size=4)
+# geom_boxplot(outlier.colour='red') +
+# coord_cartesian(ylim = c(0, 1000)) +
+#stat_summary(fun.y=mean, geom="point", shape=8, size=4)
 
 
 #boxplot
