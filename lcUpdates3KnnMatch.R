@@ -20,7 +20,7 @@ library(dplyr)
 library(class)
 library(lubridate)
 
-#updatedMonth <- as.Date('2019-03-01')
+#updatedMonth <- as.Date('2019-05-01')
 #lastDayUpdatedMonth <- updatedMonth %m+% months(1) - 1
 #previousMonth <- updatedMonth %m-% months(1)
 
@@ -66,26 +66,26 @@ FROM (select comm_month_dt, dist_id, tov_amt, new_signup_flg, ttl_cd, submt_loi_
 from `nu-skin-corp.EDW.KPIR_FLAG_DTL`
 where ttl_cd is not null --remove any retail accounts
 and ttl_cd <> 55 -- remove PFC accounts
-and comm_month_dt =  DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)
+and comm_month_dt =  '2019-05-01' --DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)
 and dist_cntry_cd in (1,2,6,13)
 and new_signup_flg = 1) kfd --US/CAN/AS/NZ only
 JOIN `nu-skin-corp.EDW.TTL` ttl ON kfd.ttl_cd = ttl.ttl_cd
 JOIN `nu-skin-corp.EDW.COMM_PER` cp ON kfd.comm_month_dt = cp.strt_dt
 LEFT JOIN (SELECT rw_id, sap_id, acct_create_dt, last_login_date, tasks_started, tasks_completed, badges_received
 FROM `nu-skin-corp.ONBOARDING.SUMMARY`
-where file_date = DATE_ADD(CURRENT_DATE(), INTERVAL -EXTRACT(DAY FROM CURRENT_DATE()) DAY)) ob ON kfd.dist_id = ob.sap_id 
+where file_date = '2019-05-31') ob ON kfd.dist_id = ob.sap_id  --DATE_ADD(CURRENT_DATE(), INTERVAL -EXTRACT(DAY FROM CURRENT_DATE()) DAY)) ob ON kfd.dist_id = ob.sap_id 
 LEFT JOIN `nu-skin-corp.EDW.CNTRY_REGION` rg ON kfd.dist_cntry_cd = rg.cntry_cd
 LEFT JOIN (select ba.rw_id, ba.badge_id, badge_desc.badge_title
 from `nu-skin-corp.ONBOARDING.BADGES_ACHIEVED` ba 
 JOIN `nu-skin-corp.ONBOARDING.BADGES` badge_desc on ba.badge_id = badge_desc.badge_id
-where ba.badge_id = 18320 and achieved_dt BETWEEN DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH) AND DATE_ADD(CURRENT_DATE(), INTERVAL -EXTRACT(DAY FROM CURRENT_DATE()) DAY)) grad 
+where ba.badge_id = 18320 and achieved_dt BETWEEN '2019-05-01' AND '2019-05-31') grad --DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH) AND DATE_ADD(CURRENT_DATE(), INTERVAL -EXTRACT(DAY FROM CURRENT_DATE()) DAY)) grad 
 ON cast(ob.rw_id as string) = cast(grad.rw_id as string)) as first
 
 LEFT JOIN (select dist_id, count(ord_id) mth_orders, round(sum(ord_pv),0) mth_pv
 from
 (SELECT ord_id, buyer_id dist_id, sum(lin_itm_pv_amt * lin_itm_qty) as ord_pv
 FROM `nu-skin-corp.EDW.ORDER_LIN_ITM_KITS`
-WHERE comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)
+WHERE comm_month_dt = '2019-05-01' --DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)
 AND on_order_flg = 1
 group by dist_id, ord_id)
 group by dist_id) as second ON first.dist_id = second.dist_id
@@ -96,7 +96,7 @@ JOIN (select comm_month_dt, dist_id, ttl_cd, new_signup_flg
 from `nu-skin-corp.EDW.KPIR_FLAG_DTL`
 where new_signup_flg = 1
 and mth_pv_act_flg = 1
-and comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)) kfd on dc.dist_cust_id = kfd.dist_id 
+and comm_month_dt = '2019-05-01') kfd on dc.dist_cust_id = kfd.dist_id --DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)) kfd on dc.dist_cust_id = kfd.dist_id 
 LEFT JOIN `nu-skin-corp.EDW.TTL` ttl ON kfd.ttl_cd = ttl.ttl_cd
 group BY spon_dist_id, kfd.comm_month_dt) as spon ON first.dist_id = spon.dist_id AND first.comm_month_dt = spon.spon_mth_dt
 "
@@ -111,9 +111,15 @@ dat <- query_results
 train_dat <- subset(dat, lc_flg == 1)
 test_dat <- subset(dat, lc_flg == 0)
 
-train_dat <- train_dat[c('mth_pv_amt', 'lc_flg', 'lc_flg')]
+
+#train_dat <- train_dat[c('mth_pv_amt', 'lc_flg')]
+#head(train_dat)
+#test_dat <- test_dat[c('mth_pv_amt', 'lc_flg')]
+#head(train_dat)
+
+train_dat <- train_dat[c('mth_pv_amt', 'lc_flg', 'mth_spon_all_cnt', 'mth_loi_flg')]
 head(train_dat)
-test_dat <- test_dat[c('mth_pv_amt', 'lc_flg', 'lc_flg')]
+test_dat <- test_dat[c('mth_pv_amt', 'lc_flg', 'mth_spon_all_cnt', 'mth_loi_flg')]
 head(train_dat)
 
 train_labels <- train_dat[c('lc_flg')]
@@ -138,7 +144,12 @@ t1 <-  dat_pred2
 
 t2 <- cbind(train_dat, t1)
 
-names(t2) [4] <- "1" 
+#remove spon and loi colums to work with old code
+t2$mth_spon_all_cnt <- NULL
+t2$mth_loi_flg <- NULL
+
+
+names(t2) [3] <- "1" 
 
 dat_list <- as.list(t1[,1])
 
@@ -166,7 +177,7 @@ bqr_auth(token = NULL, new_user = FALSE, no_auto = FALSE)
 
 bqr_upload_data(projectId = "nu-skin-corp", 
                 datasetId = "REPORTING",
-                tableId   = "SUMMARY_MONTH_ONBOARDING",
+                tableId   = "SUMMARY_MONTH_ONBOARDING_3KnnMatch",
                 upload_data = datEnd,
                 overwrite = FALSE)
 
@@ -176,9 +187,10 @@ t2$index <- seq.int(nrow(t2))
 
 #columns needed are index, 1, mth_pv_amt.y
 
-output <- as.data.frame(merge(t2, noLc, by.x = '1', by.y = 'index') [, c(5,1,29)])
+output <- as.data.frame(merge(t2, noLc, by.x = '1', by.y = 'index'))
+output <- output %>% select(index, "1", mth_pv_amt.y)
 output <- output[order(output$index),] 
-output <- output[c(3)]
+output <- output %>% select(mth_pv_amt.y)
 t2 <- cbind(t2, output)
 
 t2$var <- round(apply(t2, 1, function(x) x[1] - x[6]), 2)
@@ -186,26 +198,26 @@ summary(t2$var)
 
 project_id <- "nu-skin-corp"
 
-sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` t1
+sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_3KnnMatch` t1
 SET mth2_pv_amt = (SELECT cast(round(tov_amt,0) as int64)
 FROM `nu-skin-corp.EDW.KPIR_FLAG_DTL` kfd
 WHERE kfd.dist_id = t1.dist_id 
 and kfd.comm_month_dt = date_add(t1.comm_month_dt, interval 1 month))
-WHERE t1.comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)"
+WHERE t1.comm_month_dt = '2019-02-01' --DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)"
 
 
 query_results_tov <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
-sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING`
+sql_string <- "UPDATE `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_3KnnMatch`
 SET mth2_pv_ret_flg = 1 
-WHERE mth2_pv_amt > 0 AND comm_month_dt = DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)" 
+WHERE mth2_pv_amt > 0 AND comm_month_dt = '2019-02-01' --DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -2 MONTH)" 
 
 
 query_results_tov <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
 # Build Lifetime Value
 
-sql_string <- "update `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING` smo
+sql_string <- "update `nu-skin-corp.REPORTING.SUMMARY_MONTH_ONBOARDING_3KnnMatch` smo
 set smo.lftv_amt = (SELECT ltv.lftv_amt
 FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6MO_LTDAT` ltv
 where smo.dist_id = ltv.dist_id
@@ -223,7 +235,7 @@ where smo.dist_id IN (SELECT dist_id FROM `nu-skin-corp.ONBOARDING.SUMMARY_NEW_6
 query_results_lftv_amt <- query_exec(sql_string, project = project_id, use_legacy_sql = FALSE)
 
 
-#datEnd$f1f2 <- interaction(datEnd$lc_flg, datEnd$cntrl_group_flg)
+datEnd$f1f2 <- interaction(datEnd$lc_flg, datEnd$cntrl_group_flg)
 
 #boxplot <- ggplot(datEnd, aes(x = f1f2, y = mth_pv_amt)) +
 #  geom_boxplot(outlier.colour='red') +
@@ -237,3 +249,53 @@ query_results_lftv_amt <- query_exec(sql_string, project = project_id, use_legac
 
 
 #boxplot
+
+#install.packages('psych')
+library(psych)
+describe.by(datEnd$mth_pv_amt, datEnd$f1f2)
+describe.by(datEnd$mth_spon_all_cnt, datEnd$f1f2)
+describe.by(datEnd$mth_loi_flg, datEnd$f1f2)
+
+
+p1 = cbind(runif(100), runif(100))
+p2 = cbind(runif(100), runif(100))
+m12 = pairup(train_dat,test_dat)
+
+segs <- function(p1, p2, map){
+  plot(rbind(p1,p2),type="n",asp=1)
+  points(p1, col="green")
+  points(p2, col="red")
+  segments(p1[,1] , p1[,2], p2[map,1], p2[map,2])
+}
+
+segs(p1, p2, m12)
+
+
+
+
+pairup <- function(list1, list2){
+  keep = 1:nrow(list2)
+  used = c()
+  for(i in 1:nrow(list1)){
+    nearest = FNN::get.knnx(list2, list1[i,,drop=FALSE], 1)$nn.index[1,1]        
+    used = c(used, keep[nearest])
+    keep = keep[-nearest]
+    list2 = list2[-nearest,,drop=FALSE]
+  }
+  used
+}
+
+
+p1 = cbind(runif(100), runif(100))
+p2 = cbind(runif(100), runif(100))
+m12 = pairup(p1,p2)
+duh <- data.frame(m12)
+
+segs <- function(p1, p2, map){
+  plot(rbind(p1,p2),type="n",asp=1)
+  points(p1, col="green")
+  points(p2, col="red")
+  segments(p1[,1] , p1[,2], p2[map,1], p2[map,2])
+}
+
+segs(p1, p2, m12)
