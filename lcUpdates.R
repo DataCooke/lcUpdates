@@ -67,7 +67,7 @@ from `nu-skin-corp.EDW.KPIR_FLAG_DTL`
 where ttl_cd is not null --remove any retail accounts
 and ttl_cd <> 55 -- remove PFC accounts
 and comm_month_dt =  DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)
-and dist_cntry_cd in (1,2,6,13)
+and dist_cntry_cd in (1,2,6,13,37,38)
 and new_signup_flg = 1) kfd --US/CAN/AS/NZ only
 JOIN `nu-skin-corp.EDW.TTL` ttl ON kfd.ttl_cd = ttl.ttl_cd
 JOIN `nu-skin-corp.EDW.COMM_PER` cp ON kfd.comm_month_dt = cp.strt_dt
@@ -114,7 +114,7 @@ test_dat <- subset(dat, lc_flg == 0)
 train_dat <- train_dat[c('mth_pv_amt', 'lc_flg', 'lc_flg')]
 head(train_dat)
 test_dat <- test_dat[c('mth_pv_amt', 'lc_flg', 'lc_flg')]
-head(train_dat)
+head(test_dat)
 
 train_labels <- train_dat[c('lc_flg')]
 test_labels <- test_dat[c('lc_flg')]
@@ -132,6 +132,7 @@ pairup <- function(list1, list2){
 }
 
 dat_pred2 <- as.data.frame(pairup(train_dat, test_dat))
+#the output is a row for each training data with the matching row(index number) from test_dat
 data.frame(table(dat_pred2))
 
 t1 <-  dat_pred2 
@@ -147,7 +148,9 @@ noLc <- subset(dat, lc_flg == 0)
 
 noLc$cntrl_group_flg = 0
 noLc$index <- seq.int(nrow(noLc))
+#for each nonLc row, if that row number(index number) is in the output from the knn (dat_list), give it a flag for being a control group.
 noLc$cntrl_group_flg[noLc$index %in% dat_list] <- 1
+noLc$cntrl_group_index[noLc$index %in% dat_list] <- dat_list[,1]
 lc$cntrl_group_flg = 0
 lc$index <- seq.int(nrow(lc))
 
