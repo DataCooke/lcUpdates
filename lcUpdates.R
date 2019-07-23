@@ -150,7 +150,6 @@ noLc$cntrl_group_flg = 0
 noLc$index <- seq.int(nrow(noLc))
 #for each nonLc row, if that row number(index number) is in the output from the knn (dat_list), give it a flag for being a control group.
 noLc$cntrl_group_flg[noLc$index %in% dat_list] <- 1
-#noLc$cntrl_group_index[noLc$index %in% dat_list] <- dat_list[,1]
 lc$cntrl_group_flg = 0
 lc$index <- seq.int(nrow(lc))
 
