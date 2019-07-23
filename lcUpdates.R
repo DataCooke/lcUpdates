@@ -68,7 +68,7 @@ where ttl_cd is not null --remove any retail accounts
 and ttl_cd <> 55 -- remove PFC accounts
 and comm_month_dt =  DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL -1 MONTH)
 and dist_cntry_cd in (1,2,6,13,37,38)
-and new_signup_flg = 1) kfd --US/CAN/AS/NZ only
+and new_signup_flg = 1) kfd --US/CAN/AS/NZ/PF/NC only
 JOIN `nu-skin-corp.EDW.TTL` ttl ON kfd.ttl_cd = ttl.ttl_cd
 JOIN `nu-skin-corp.EDW.COMM_PER` cp ON kfd.comm_month_dt = cp.strt_dt
 LEFT JOIN (SELECT rw_id, sap_id, acct_create_dt, last_login_date, tasks_started, tasks_completed, badges_received
@@ -150,7 +150,7 @@ noLc$cntrl_group_flg = 0
 noLc$index <- seq.int(nrow(noLc))
 #for each nonLc row, if that row number(index number) is in the output from the knn (dat_list), give it a flag for being a control group.
 noLc$cntrl_group_flg[noLc$index %in% dat_list] <- 1
-noLc$cntrl_group_index[noLc$index %in% dat_list] <- dat_list[,1]
+#noLc$cntrl_group_index[noLc$index %in% dat_list] <- dat_list[,1]
 lc$cntrl_group_flg = 0
 lc$index <- seq.int(nrow(lc))
 
